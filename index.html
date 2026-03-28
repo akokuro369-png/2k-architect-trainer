@@ -475,7 +475,7 @@ select:focus{outline:none;border-color:var(--primary);}
       <div class="subject-chips">
         <button class="chip active" onclick="setSubj(this,'')">すべて</button>
         <button class="chip" onclick="setSubj(this,'計画')">🏛 計画</button>
-        <button class="chip" onclick="setSubj(this,'法規')">ښ�️ 法規</button>
+        <button class="chip" onclick="setSubj(this,'法規')">⚖️ 法規</button>
         <button class="chip" onclick="setSubj(this,'構造')">🏗 構造</button>
         <button class="chip" onclick="setSubj(this,'施工')">🔨 施工</button>
       </div>
@@ -759,9 +759,9 @@ async function loadFromGasFull() {
   try {
     const d = await gasGet('load');
     if (!d || d.status === 'error') { setSyncDot('err'); return false; }
-    if (d.progress       && d.progress       !== '{}') localStorage.setItem('2k_prog2',  d.progress);
-    if (d.attempts       && d.attempts       !== '[]') localStorage.setItem('2k_att',     d.attempts);
-    if (d.day            && d.day            !== '{}') localStorage.setItem('2k_day',     d.day);
+    if (d.progress      && d.progress      !== '{}') localStorage.setItem('2k_prog2',  d.progress);
+    if (d.attempts      && d.attempts      !== '[]') localStorage.setItem('2k_att',     d.attempts);
+    if (d.day           && d.day           !== '{}') localStorage.setItem('2k_day',     d.day);
     if (d.ans_overrides && d.ans_overrides !== '{}') localStorage.setItem('2k_ans_ov', d.ans_overrides);
     if (d.csv_file_id) localStorage.setItem('2k_csv_file_id', d.csv_file_id);
     setSyncDot('ok');
@@ -904,7 +904,7 @@ function sortYears(arr) {
   return arr.sort((a,b)=>rank(a)-rank(b));
 }
 
-function sbadge(s){ return {計申:'bp',法規:'bl',構造:'bs',施工:'bc'}[s]||''; }
+function sbadge(s){ return {計画:'bp',法規:'bl',構造:'bs',施工:'bc'}[s]||''; }
 
 function getAns(q) {
   // P0: localStorage正答メモ（ユーザーが手動登録）
@@ -958,7 +958,7 @@ function getAns(q) {
     if(right.length===1) return right[0];
   }
 
-  // P9: テキスト抽出→)��択肢照合
+  // P9: テキスト抽出→選択肢照合
   const ws=s=>s.replace(/[\s　]/g,'');
   let ansText=null;
   m=exp.match(/(?:不適当|誤っている|正しくない)[なの]?(?:もの|選択肢)?は[「『]([\s\S]{5,200}?)[」』]/);
@@ -1128,152 +1128,144 @@ function switchTab(tab) {
 // =====================================================================
 function renderList() {
   const prog=getProg(), pool=getPool(), wrap=document.getElementById('q-list');
-  if(!pool.length){ wrap.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><p>該当する問題がありませこ</p></div>'; return; }
+  if(!pool.length){ wrap.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><p>該当する問題がありません</p></div>'; return; }
   wrap.innerHTML=pool.map((q,i)=>{
     const p  =prog[qid(q)];
-    const lr =p?p.l
-  // Source viewer (図面・画像がある元ページをiframeで表示)
-  const srcUrl=q['URL']||'';
-  const sva=document.getElementById('src-viewer-area');
-  if(srcUrl){
-    sva.innerHTML=`<button class="src-viewer-btn" onclick="toggleSrcViewer(this,'${srcUrl.replace(/'/g,"\\'")}')">📄 元の問題を見る（図・画像）</button>
-      <div class="src-viewer-wrap" id="src-viewer-wrap">
-        <div class="src-viewer-bar"><span>元サイト表示中</span><button class="src-close-btn" onclick="closeSrcViewer()">閉じる ✕</button></div>
-        <iframe id="src-iframe" sandbox="allow-same-origin allow-scripts" loading="lazy"></iframe>
+    const lr =p?p.last_result:'';
+    const cl =p&&p.last_confidence_low;
+    const ico=lr==='○'?'✅':lr==='×'?'❌':'⬜';
+    const rc =lr==='○'?'ok-row':lr==='×'?'ng-row':'';
+    const dlr=cl?' dl-row':'';
+    const dlt=cl?`<span class="badge bd" style="margin-left:3px">△</span>`:'';
+    const nt =p&&p.note?'📝':'';
+    const txt=(q['問題文']||'').substring(0,52)+((q['問題文']||'').length>52?'…':'');
+    return `
+      <div class="q-row ${rc}${dlr}" onclick="openFromList(${i})">
+        <span class="q-num">${ico} ${q['科目']} ${q['問題番号']}<br><small>${q['年度']}</small></span>
+        <span class="q-txt">${txt} ${nt}</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+          <span class="badge ${sbadge(q['科目'])}">${q['科目']}</span>${dlt}
+        </span>
       </div>`;
-  } else {
-    sva.innerHTML='';
-  }
+  }).join('');
+}
 
-  document.getElementById('q-body').textContent =q['問題文']||'';
-
-  const opts=[1,2,3,4,5].map(i=>q[`選択肢${i}`]).filter(Boolean);
-  document.getElementById('opts').innerHTML=opts.map((o,i)=>`
-    <div class="option" id="o${i+1}" onclick="pick(${i+1})">
-      <div class="opt-num">${i+1}</div>
-      <div class="opt-txt">${o}</div>
-    </div>`).join('');
-
+function openFromList(idx) {
+  const pool=getPool();
+  sessType='list';
+  sess={qs:[pool[idx]],idx:0,res:[],done:false};
+  answered=false; deltaOn=false; noteOpen=false; selOpt=0;
+  activeTab='quiz';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-quiz').classList.add('active');
+  document.getElementById('view-list').style.display='none';
+  document.getElementById('view-quiz').style.display='block';
+  document.getElementById('filter-bar').style.display='flex';
+  document.getElementById('mode-banner').innerHTML='';
+  document.getElementById('sess-hdr').style.display='flex';
+  document.getElementById('q-card').style.display='block';
   document.getElementById('after-ans').style.display='none';
-  answered=false; selOpt=0;
-  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('session-end').style.display='none';
+  renderQ();
 }
 
 // =====================================================================
-// ANSWER
+// SESSION GENERATION (優先ロジック)
+// Priority: 1=△ 2=× 3=低正答率 4=新規 5=維持
+// 配分: 弱点3 + 新規1 + 維持1
 // =====================================================================
-function pick(n){
-  if(answered) return;
-  selOpt=n;
-  document.querySelectorAll('.option').forEach(o=>o.classList.remove('sel'));
-  const el=document.getElementById('o'+n);
-  if(el) el.classList.add('sel');
-  submit();
-}
-
-function submit(){
-  if(answered||!selOpt) return;
-  answered=true;
-
-  const q  =sess.qs[sess.idx];
-  const cor=getAns(q);
-  const ok =cor!==null&&selOpt===cor;
-  const unknown=cor===null; // 正答が解説から取れない場合
-  const id =qid(q);
-
-  // Highlight options
-  document.querySelectorAll('.option').forEach(o=>o.classList.add('disabled'));
-  if(cor!==null){ const e=document.getElementById('o'+cor); if(e) e.classList.add('c-opt'); }
-  if(!ok&&!unknown){ const e=document.getElementById('o'+selOpt); if(e) e.classList.add('w-opt'); }
-
-  // Save Progress (正答不明の場合は記録しない)
+function generateSess(type) {
   const prog=getProg();
-  if(!prog[id]) prog[id]={attempt_count:0,correct_count:0,last_result:null,last_confidence_low:false,note:'',last_attempt_at:null};
-  const ent=prog[id];
-  if(!unknown){
-    ent.attempt_count++;
-    if(ok) ent.correct_count++;
-    ent.last_result=ok?'○':'×';
-    ent.last_attempt_at=new Date().toISOString();
-    saveProg(prog);
+  let pool=getPool();
+
+  if(type==='weak'){
+    pool=pool.filter(q=>{ const p=prog[qid(q)]; return p&&(p.last_confidence_low||p.last_result==='×'); });
+    if(!pool.length) return [];
   }
 
-  // Log attempt (1回1行) - 正答不明はスキップ
-  if(!unknown) addAttempt({ts:new Date().toISOString(), qid:id, ok, cl:ent.last_confidence_low, stype:sessType});
-
-  // Day streak
-  const day=getDay();
-  day.tot++;
-  if(ok){day.cor++;day.streak++;}else if(!unknown){day.streak=0;}
-  saveDay(day);
-
-  updateHdr();
-  showAfter(ok, cor, q, ent, unknown);
-  showCombo(day.streak);
-  queueSync(); // Googleドライブへ自動同期（3秒後）
-}
-
-function showAfter(ok, cor, q, ent, unknown){
-  const rw=document.getElementById('result-wrap');
-  if(unknown){
-    const qId=qid(q);
-    rw.innerHTML=`<div class="rbanner" style="background:var(--surf2);border:1px solid var(--border);flex-direction:column;align-items:flex-start;gap:10px">
-      <div style="display:flex;align-items:center;gap:10px"><span class="ricon">📖</span><div class="rtxt"><h3>解説を確認</h3><p>解説を見て正答を記録しておく、次回から自動判定されます。</p></div></div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 4px">
-        <span style="font-size:.8rem;color:var(--muted)">正答番号:</span>
-        ${[1,2,3,4,5].map(n=>`<button class="btn btn-ghost ans-ov-btn" style="min-width:36px;padding:6px 10px" onclick="recordAnsOv('${qId}',${n},this,${selOpt})">${n}</button>`).join('')}
-      </div>
-    </div>`;
-  } else {
-    rw.innerHTML=ok
-      ?`<div class="rbanner rok"><span class="ricon">⭕</span><div class="rtxt"><h3>正解！</h3><p>正答: ${cor+'番'}</p></div></div>`
-      :`<div class="rbanner rng"><span class="ricon">❌</span><div class="rtxt"><h3>不正解</h3><p>正答は ${cor+'番'} でした</p></div></div>`;
+  function score(q){
+    const p=prog[qid(q)];
+    if(!p||!p.attempt_count) return {q,rank:4,age:0};
+    const acc=p.attempt_count>0?p.correct_count/p.attempt_count:0;
+    const age=Date.now()-new Date(p.last_attempt_at||0).getTime();
+    if(p.last_confidence_low)          return {q,rank:1,age};
+    if(p.last_result==='×')           return {q,rank:2,age};
+    if(p.attempt_count>=3&&acc<0.7)   return {q,rank:3,age};
+    return {q,rank:5,age};
   }
 
-  // Delta
-  deltaOn=ent.last_confidence_low;
-  updDelta();
+  const scored=pool.map(score).sort((a,b)=>a.rank-b.rank||b.age-a.age);
+  if(type==='weak') return scored.slice(0,N).map(s=>s.q);
 
-  // Note
-  const note=ent.note||'';
-  document.getElementById('note-ta').value=note;
-  const tog=document.getElementById('note-tog'), lbl=document.getElementById('note-lbl');
-  if(note){ tog.classList.add('has-note'); lbl.textContent='📝 メモあり'; }
-  else     { tog.classList.remove('has-note'); lbl.textContent='📝 メモ（任意）'; }
-  document.getElementById('note-body').classList.remove('open');
-  document.getElementById('note-arrow').textContent='▼';
-  document.getElementById('note-saved').style.display='none';
-  noteOpen=false;
-
-  // Explanation
-  const expl=q['解説']||'', url=q['URL']||'';
-  document.getElementById('expl-wrap').innerHTML=(expl||url)?`
-    <div class="expl">
-      <button class="expl-tog" onclick="togExpl(this)">📖 解説を見る <span>▼</span></button>
-      <div class="expl-body">
-        ${expl?`<p>${expl.replace(/\//g,'<br>').replace(/\n/g,'<br>')}</p>`:''}
-        ${url?`<a class="expl-url" href="${url}" target="_blank" rel="noopener">🔗 詳細ページり開く</a>`:''}
-      </div>
-    </div>`:'';
-
-  const isLast=sess.idx>=sess.qs.length-1;
-  document.getElementById('btn-next').textContent=isLast?'結果を見る →':'次の問題 →';
-  document.getElementById('after-ans').style.display='block';
+  const seen=new Set(), pick=[];
+  const add=q=>{ const id=qid(q); if(!seen.has(id)){seen.add(id);pick.push(q);} };
+  scored.filter(s=>s.rank<=2).slice(0,3).forEach(s=>add(s.q));
+  scored.filter(s=>s.rank===4).slice(0,1).forEach(s=>add(s.q));
+  scored.filter(s=>s.rank===5).sort((a,b)=>b.age-a.age).slice(0,1).forEach(s=>add(s.q));
+  scored.filter(s=>s.rank===3).slice(0,1).forEach(s=>add(s.q));
+  for(const s of scored){ if(pick.length>=N) break; add(s.q); }
+  return pick.slice(0,N);
 }
 
 // =====================================================================
-// DELTA TOGGLE
+// SESSION FLOW
 // =====================================================================
-function toggleDelta(){
-  if(!answered) return;
-  deltaOn=!deltaOn;
-  updDelta();
-  const id=qid(sess.qs[sess.idx]);
-  const prog=getProg();
-  if(prog[id]){ prog[id].last_confidence_low=deltaOn; saveProg(prog); }
-  updateHdr();
+function startSess() {
+  const qs=generateSess(sessType);
+  if(!qs.length){
+    document.getElementById('mode-banner').innerHTML=sessType==='weak'
+      ?'<div class="mode-banner">🎉 弱点問題なし！△/×の問題がありません。</div>'
+      :'<div class="mode-banner">⚠️ 条件に合う問題がありません。</div>';
+    document.getElementById('sess-hdr').style.display='none';
+    document.getElementById('q-card').style.display='none';
+    document.getElementById('after-ans').style.display='none';
+    document.getElementById('session-end').style.display='none';
+    return;
+  }
+  sess={qs,idx:0,res:[],done:false};
+  answered=false; deltaOn=false; noteOpen=false; selOpt=0;
+  const chapLabel=fToc&&tocM?`📚 ${(tocM.chapters[fToc]||{}).s||'章'+fToc}`:'';
+  const weakLabel=sessType==='weak'?'△ 弱点モード：△または×の問題を優先出題':'';
+  document.getElementById('mode-banner').innerHTML=
+    (weakLabel||chapLabel)?`<div class="mode-banner">${[weakLabel,chapLabel].filter(Boolean).join('　')}</div>`:'';
+  document.getElementById('sess-hdr').style.display='flex';
+  document.getElementById('q-card').style.display='block';
+  document.getElementById('after-ans').style.display='none';
+  document.getElementById('session-end').style.display='none';
+  renderQ();
 }
-function updDe
+
+function renderQ() {
+  const q=sess.qs[sess.idx];
+  const p=getProg()[qid(q)];
+
+  // Dots
+  document.getElementById('sess-dots').innerHTML=sess.qs.map((_,i)=>{
+    let c='';
+    if(i<sess.res.length){ const r=sess.res[i]; c=r.cl?'dl':r.ok?'ok':'ng'; }
+    else if(i===sess.idx) c='cur';
+    return `<div class="dot ${c}"></div>`;
+  }).join('');
+  document.getElementById('sess-lbl').textContent=`${sess.idx+1} / ${sess.qs.length}問`;
+
+  // Card
+  document.getElementById('q-num').textContent  =`${q['科目']} ${q['問題番号']}`;
+  document.getElementById('q-subj').textContent =q['科目'];
+  document.getElementById('q-subj').className   =`badge ${sbadge(q['科目'])}`;
+  document.getElementById('q-year').textContent =q['年度'];
+  document.getElementById('q-delta-prev').style.display=(p&&p.last_confidence_low)?'':'none';
+  // Chapter badge
+  const cn=chapName(q);
+  let chapEl=document.getElementById('q-chap-badge');
+  if(!chapEl){
+    chapEl=document.createElement('span');
+    chapEl.id='q-chap-badge';
+    chapEl.className='chap-badge';
+    document.getElementById('q-card-hdr-wrap').appendChild(chapEl);
+  }
+  chapEl.textContent=cn?`📚 ${cn}`:'';
+  chapEl.style.display=cn?'':'none';
+
   // Source viewer (図面・画像がある元ページをiframeで表示)
   const srcUrl=q['URL']||'';
   const sva=document.getElementById('src-viewer-area');
@@ -1512,8 +1504,8 @@ function showSessEnd(){
       <div class="se-card">
         <div class="se-icon">${ico}</div>
         <div class="se-info">
-          <div class="se-meta">${r.q['科目']} ${r.q['問題番号']} ${r.q['年度+]}</div>
-          <div style="font-size:.8rem">$x(r.q['問題文']||'').substring(0,38)}…</div>
+          <div class="se-meta">${r.q['科目']} ${r.q['問題番号']} ${r.q['年度']}</div>
+          <div style="font-size:.8rem">${(r.q['問題文']||'').substring(0,38)}…</div>
         </div>
         <div class="se-res ${cls}">${r.ok?'正解':'不正解'}${dlt}</div>
       </div>`;
@@ -1598,7 +1590,7 @@ function renderDash(){
     <div class="dash-card"><div class="big" style="color:#a78bfa">${days}</div><div class="lbl">📅 試験まで（日）</div></div>`;
 
   const subjs=['計画','法規','構造','施工'];
-  const fc=w計画:'fp',法規:'fl',構造:'fs',施工:'fc'};
+  const fc={計画:'fp',法規:'fl',構造:'fs',施工:'fc'};
   document.getElementById('subj-bars').innerHTML=subjs.map(s=>{
     const qs  =questions.filter(q=>q['科目']===s);
     const qids=qs.map(q=>qid(q));
@@ -1682,33 +1674,59 @@ function renderChap() {
           <span style="display:flex;align-items:center;gap:8px">
             <span class="cg-summary">${subjDone}/${subjTotal}問 ${subjPct}%${subjDl?` △${subjDl}`:''}</span>
             <span class="cg-arrow" id="cg-arrow-${subj}" style="transform:${isOpen?'':'rotate(-90deg)'}">▼</span>
-          ��[����]���]��\��H��\Yܛ�\X��I�\��[����[�Ή��H�YH���X��KI��X��H���][\�O�]����]��JK���[�	��N���[Y[���][[Y[��RY
-	ݚY]�X�\	�K�[��\�SZ[B���[��[ۈ���P�\ܛ�\
-�X��]Q[
-H�ۜ���OY��[Y[���][[Y[��RY
-	���X��KI���X��N�ۜ�\����Y��[Y[���][[Y[��RY
-	���X\����I���X��N�ۜ�\��[�X��K��\��\�����J	��[��N�\ܛ�\�[���X��OZ\��[�\���˜�[K��[�ٛܛOZ\��[���Ήܛ�]JNLY�I�B���[��[ۈ�[\��\
-��Y�X��H��X��\�X������T��[����Y
-N��\]H�X��X��\��[Y[��]Y\�T�[X�ܐ[
-	˘�\	�K��ܑXX�
-�O�˘�\��\���[[ݙJ	�X�]�I�N�ۜ���X˙�]]�X�]J	�ۘ�X���_	��Y��˚[��Y\�	���X��I�
-JH˘�\��\��Y
-	�X�]�I�NJN�[]P�\�[
-�X��N��[Y[���][[Y[��RY
-	��\\�[	�K��[YO]��Y��[Y[���][[Y[��RY
-	ٚ[\�X�\��K��\��\��Y
-	��\Y�[\�XX�]�I�N��]�X�	�]Z^��NB����OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOB����T�U���OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOB��[��[ۈ�\�][
+          </span>
+        </div>
+        <div class="chap-group-body${isOpen?' open':''}" id="cg-body-${subj}">${items}</div>
+      </div>`;
+  }).join('');
 
-^Y�X�ۙ�\�J	��fx�nx�i��k�ki���*&:c,�स���������8�e��o��fx�b��'��JH�]\���̚����̉�	̚��]	�	̚��^I�	̚����ܙ\���	̚���\��[ۉ�K��ܑXX�
-�O���[�ܘY�K��[[ݙR][J�JN\]R�
-N��[�\�\�
+  document.getElementById('view-chap').innerHTML=html;
+}
 
-N��[�\�\�
+function toggleChapGroup(subj, titleEl) {
+  const body=document.getElementById('cg-body-'+subj);
+  const arrow=document.getElementById('cg-arrow-'+subj);
+  const isOpen=body.classList.toggle('open');
+  chapGroupOpen[subj]=isOpen;
+  arrow.style.transform=isOpen?'':'rotate(-90deg)';
+}
 
-N[\�
-	����������8�e��o��e��g�� ��NB����OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOB���:-m�b�y�`�b'y�'�c%���T�T�8�c:*+yk���"8�o��j��URz(j9�.�हb!�ࢹ����b���OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOB��[��[ۊ
-^Y��\�\�
-^�ۜ��OY��[Y[���][[Y[��RY
-	��\�[�YX\�XI�NY��JH�K��[K�\�^OI��H[�H�ۜ�؏Y��[Y[���][[Y[��RY
-	��[��X���NY�؊H؋��[K�\�^OIۛۙI�B�JJ
-N��ܚ\��؛�O���[�
+function jumpToChap(tocId, subj) {
+  fSubj=subj; fToc=String(tocId);
+  // Update subject chips
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.classList.remove('active');
+    const oc=c.getAttribute('onclick')||'';
+    if(oc.includes(`'${subj}'`)) c.classList.add('active');
+  });
+  populateChapSel(subj);
+  document.getElementById('chap-sel').value=tocId;
+  document.getElementById('filter-bar').classList.add('chap-filter-active');
+  switchTab('quiz');
+}
+
+// =====================================================================
+// RESET
+// =====================================================================
+function resetAll(){
+  if(!confirm('すべての学習記録をリセットしますか？')) return;
+  ['2k_prog2','2k_att','2k_day','2k_progress','2k_session'].forEach(k=>localStorage.removeItem(k));
+  updateHdr(); renderList(); renderDash();
+  alert('リセットしました。');
+}
+
+// =====================================================================
+// 起動時初期化: GAS URLが設定済みならUI表示を切り替え
+// =====================================================================
+(function(){
+  if(gasUrl){
+    const ga=document.getElementById('gas-load-area');
+    if(ga) ga.style.display='';
+  } else {
+    const sb=document.getElementById('sync-btn');
+    if(sb) sb.style.display='none';
+  }
+})();
+</script>
+</body>
+</html>
