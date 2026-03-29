@@ -1297,7 +1297,10 @@ function renderQ() {
   const srcUrl=q['URL']||'';
   const sva=document.getElementById('src-viewer-area');
   if(srcUrl){
-    sva.innerHTML=`<button class="src-viewer-btn" onclick="toggleSrcViewer(this,'${srcUrl.replace(/'/g,"\\'")}')">📄 元の問題を見る（図・画像）</button>
+    sva.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="src-viewer-btn" onclick="toggleSrcViewer(this,'${srcUrl.replace(/'/g,"\\'")}')">📄 元の問題を見る（図・画像）</button>
+        <a href="${srcUrl.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.82rem;padding:6px 12px;border-radius:8px;border:1px solid rgba(56,189,248,.4);color:var(--primary);text-decoration:none;white-space:nowrap;">🔗 別タブで開く</a>
+      </div>
       <div class="src-viewer-wrap" id="src-viewer-wrap">
         <div class="src-viewer-bar"><span>元サイト表示中</span><button class="src-close-btn" onclick="closeSrcViewer()">閉じる ✕</button></div>
         <iframe id="src-iframe" sandbox="allow-same-origin allow-scripts" loading="lazy"></iframe>
