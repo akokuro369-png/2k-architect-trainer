@@ -512,6 +512,9 @@ select:focus{outline:none;border-color:var(--primary);}
         <div id="src-viewer-area"></div>
         <div class="q-card-body" id="q-body"></div>
         <div class="options" id="opts"></div>
+        <div style="text-align:right;margin-top:8px;">
+          <button id="btn-skip" onclick="skipQ()" style="background:none;border:1px solid rgba(148,163,184,.3);color:var(--muted);font-size:.78rem;padding:4px 12px;border-radius:6px;cursor:pointer;">スキップ →</button>
+        </div>
       </div>
 
       <!-- After-answer area -->
@@ -1417,6 +1420,8 @@ function showAfter(ok, cor, q, ent, unknown){
   const isLast=sess.idx>=sess.qs.length-1;
   document.getElementById('btn-next').textContent=isLast?'結果を見る →':'次の問題 →';
   document.getElementById('after-ans').style.display='block';
+  const skipBtn=document.getElementById('btn-skip');
+  if(skipBtn) skipBtn.style.display='none';
 }
 
 // =====================================================================
@@ -1494,6 +1499,15 @@ function togExpl(btn){
 // =====================================================================
 // SESSION NAVIGATION
 // =====================================================================
+function skipQ(){
+  if(answered) return; // 回答済みならスキップ不可
+  if(sess.idx>=sess.qs.length-1){ showSessEnd(); return; }
+  sess.idx++;
+  answered=false; deltaOn=false; selOpt=0;
+  document.getElementById('after-ans').style.display='none';
+  renderQ();
+}
+
 function nextQ(){
   const prog=getProg(), q=sess.qs[sess.idx], p=prog[qid(q)];
   sess.res.push({ok:p?p.last_result==='○':false, cl:p?p.last_confidence_low:false, q});
@@ -1502,6 +1516,8 @@ function nextQ(){
   sess.idx++;
   answered=false; deltaOn=false; selOpt=0;
   document.getElementById('after-ans').style.display='none';
+  const skipBtn=document.getElementById('btn-skip');
+  if(skipBtn) skipBtn.style.display='';
   renderQ();
 }
 
