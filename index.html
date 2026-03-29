@@ -1161,8 +1161,9 @@ function renderList() {
 
 function openFromList(idx) {
   const pool=getPool();
-  sessType='list';
-  sess={qs:[pool[idx]],idx:0,res:[],done:false};
+  sessType='browse';
+  // idx番目から最後まで全問を対象にする（次へで続けられる）
+  sess={qs:pool.slice(idx), idx:0, res:[], done:false};
   answered=false; deltaOn=false; noteOpen=false; selOpt=0;
   activeTab='quiz';
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -1170,7 +1171,8 @@ function openFromList(idx) {
   document.getElementById('view-list').style.display='none';
   document.getElementById('view-quiz').style.display='block';
   document.getElementById('filter-bar').style.display='flex';
-  document.getElementById('mode-banner').innerHTML='';
+  document.getElementById('mode-banner').innerHTML=
+    `<div class="mode-banner">📋 一覧ブラウジング（${idx+1}問目〜 全${pool.length}問）</div>`;
   document.getElementById('sess-hdr').style.display='flex';
   document.getElementById('q-card').style.display='block';
   document.getElementById('after-ans').style.display='none';
@@ -1245,6 +1247,12 @@ function startSess() {
 }
 
 function renderQ() {
+  // ③ 前回の回答状態を明示的にクリア（同端末で再解答時の残り対策）
+  answered=false; selOpt=0; deltaOn=false;
+  document.querySelectorAll('.option').forEach(o=>{
+    o.className='option';
+  });
+
   const q=sess.qs[sess.idx];
   const p=getProg()[qid(q)];
 
@@ -1504,7 +1512,10 @@ function togExpl(btn){
 // =====================================================================
 function skipQ(){
   if(answered) return; // 回答済みならスキップ不可
-  if(sess.idx>=sess.qs.length-1){ showSessEnd(); return; }
+  if(sess.idx>=sess.qs.length-1){
+    if(sessType==='browse'){ switchTab('list'); return; }
+    showSessEnd(); return;
+  }
   sess.idx++;
   answered=false; deltaOn=false; selOpt=0;
   document.getElementById('after-ans').style.display='none';
@@ -1515,7 +1526,10 @@ function nextQ(){
   const prog=getProg(), q=sess.qs[sess.idx], p=prog[qid(q)];
   sess.res.push({ok:p?p.last_result==='○':false, cl:p?p.last_confidence_low:false, q});
 
-  if(sess.idx>=sess.qs.length-1){ showSessEnd(); return; }
+  if(sess.idx>=sess.qs.length-1){
+    if(sessType==='browse'){ switchTab('list'); return; }
+    showSessEnd(); return;
+  }
   sess.idx++;
   answered=false; deltaOn=false; selOpt=0;
   document.getElementById('after-ans').style.display='none';
@@ -1745,17 +1759,57 @@ function jumpToChap(tocId, subj) {
   populateChapSel(subj);
   document.getElementById('chap-sel').value=tocId;
   document.getElementById('filter-bar').classList.add('chap-filter-active');
-  switchTab('quiz');
+  // 章別はブラウジングモードで開く（5問制限なし）
+  const chapLabel=tocM&&tocM.chapters[tocId]?tocM.chapters[tocId].s||('章'+tocId):'';
+  startBrowseMode(`${subj}${chapLabel?' / '+chapLabel:''}`);
+}
+
+// ブラウジングモード：フィルタ済み全問を順番に解く（5問制限なし）
+function startBrowseMode(label) {
+  const pool=getPool();
+  if(!pool.length){
+    alert('該当する問題がありません。');
+    return;
+  }
+  sessType='browse';
+  sess={qs:pool, idx:0, res:[], done:false};
+  answered=false; deltaOn=false; noteOpen=false; selOpt=0;
+  activeTab='quiz';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-quiz').classList.add('active');
+  document.getElementById('view-list').style.display='none';
+  document.getElementById('view-quiz').style.display='block';
+  document.getElementById('view-chap').style.display='none';
+  document.getElementById('view-dash').style.display='none';
+  document.getElementById('filter-bar').style.display='flex';
+  document.getElementById('mode-banner').innerHTML=
+    `<div class="mode-banner">📚 ${label}（全${pool.length}問）</div>`;
+  document.getElementById('sess-hdr').style.display='flex';
+  document.getElementById('q-card').style.display='block';
+  document.getElementById('after-ans').style.display='none';
+  document.getElementById('session-end').style.display='none';
+  renderQ();
 }
 
 // =====================================================================
 // RESET
 // =====================================================================
-function resetAll(){
-  if(!confirm('すべての学習記録をリセットしますか？')) return;
+async function resetAll(){
+  if(!confirm('すべての学習記録をリセットしますか？\n（ローカルとGoogleドライブ両方クリアします）')) return;
+  // ローカルをクリア
   ['2k_prog2','2k_att','2k_day','2k_progress','2k_session'].forEach(k=>localStorage.removeItem(k));
+  // Googleドライブもリセット
+  if(gasUrl){
+    try{
+      await fetch(gasUrl, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'reset'})
+      });
+    } catch(e){ console.warn('GASリセット失敗:', e); }
+  }
   updateHdr(); renderList(); renderDash();
-  alert('リセットしました。');
+  alert('リセット完了！学習記録をすべて削除しました。');
 }
 
 // =====================================================================
