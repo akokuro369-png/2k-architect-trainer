@@ -1139,12 +1139,21 @@ function renderList() {
     const dlt=cl?`<span class="badge bd" style="margin-left:3px">△</span>`:'';
     const nt =p&&p.note?'📝':'';
     const txt=(q['問題文']||'').substring(0,52)+((q['問題文']||'').length>52?'…':'');
+
+    // ★追加：正解回数/解答回数 表示
+    const at = p?.attempt_count || 0;
+    const cc = p?.correct_count || 0;
+    const score = at
+      ? `<span class="badge" style="background:rgba(148,163,184,.12);color:var(--muted)">${cc}/${at} (${Math.round(cc/at*100)}%)</span>`
+      : '';
+
     return `
       <div class="q-row ${rc}${dlr}" onclick="openFromList(${i})">
         <span class="q-num">${ico} ${q['科目']} ${q['問題番号']}<br><small>${q['年度']}</small></span>
         <span class="q-txt">${txt} ${nt}</span>
         <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
           <span class="badge ${sbadge(q['科目'])}">${q['科目']}</span>${dlt}
+          ${score}
         </span>
       </div>`;
   }).join('');
