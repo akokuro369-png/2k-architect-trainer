@@ -905,6 +905,10 @@ function qid(q) {
   return `${q['科目']}_${q['問題番号']}_${q['年度']}`;
 }
 
+const qk = qid(q);
+const has = !!prog[qk];
+const score = `<span class="badge" style="background:rgba(148,163,184,.12);color:var(--muted)">${has ? 'HIT' : 'MISS'}</span>`;
+
 function sortYears(arr) {
   const rank = y => {
     if(y.startsWith('平成')) return parseInt(y.replace('平成','').replace('年',''))||0;
