@@ -523,10 +523,11 @@ select:focus{outline:none;border-color:var(--primary);}
         <!-- Result -->
         <div id="result-wrap"></div>
 
-        <!-- Delta toggle -->
-        <div class="delta-sec">
-          <span class="delta-lbl">理解不十分・運で正解・なんとなく外した</span>
+        <!-- Delta toggle + Bookmark -->
+        <div class="delta-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="delta-lbl" style="flex:1;">理解不十分・運で正解・なんとなく外した</span>
           <button class="delta-btn" id="delta-btn" onclick="toggleDelta()">△ 自信なし</button>
+          <button class="delta-btn" id="bookmark-btn" onclick="toggleBookmark()" style="min-width:unset;padding:6px 10px;">🔖</button>
         </div>
 
         <!-- Note -->
@@ -570,6 +571,10 @@ select:focus{outline:none;border-color:var(--primary);}
 
     <!-- VIEW: DASH -->
     <div id="view-dash" style="display:none">
+      <!-- 今日の目標カード -->
+      <div id="today-card" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:12px;padding:14px 16px;margin-bottom:14px;"></div>
+      <!-- 前回の問題カード -->
+      <div id="last-q-card"></div>
       <div class="dash-grid" id="dash-grid"></div>
       <h3 style="margin-bottom:10px;font-size:.88rem;color:var(--muted)">科目別 正答率・進捗</h3>
       <div id="subj-bars"></div>
@@ -1140,6 +1145,7 @@ function renderList() {
     const rc =lr==='○'?'ok-row':lr==='×'?'ng-row':'';
     const dlr=cl?' dl-row':'';
     const dlt=cl?`<span class="badge bd" style="margin-left:3px">△</span>`:'';
+    const bkm=p&&p.bookmarked?`<span style="margin-left:3px;opacity:.8">🔖</span>`:'';
     const nt =p&&p.note?'📝':'';
     const txt=(q['問題文']||'').substring(0,52)+((q['問題文']||'').length>52?'…':'');
     const atc=p&&p.attempt_count>0?p.attempt_count:0;
@@ -1152,7 +1158,7 @@ function renderList() {
         <span class="q-num">${ico} ${q['科目']} ${q['問題番号']}<br><small>${q['年度']}</small></span>
         <span class="q-txt">${txt} ${nt}</span>
         <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-          <span class="badge ${sbadge(q['科目'])}">${q['科目']}</span>${dlt}
+          <span class="badge ${sbadge(q['科目'])}">${q['科目']}</span>${dlt}${bkm}
           ${statsStr}
         </span>
       </div>`;
@@ -1326,6 +1332,10 @@ function renderQ() {
       <div class="opt-txt">${o}</div>
     </div>`).join('');
 
+  // ブックマーク状態を復元
+  bookmarkOn=!!(p&&p.bookmarked);
+  updBookmark();
+
   document.getElementById('after-ans').style.display='none';
   answered=false; selOpt=0;
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1451,6 +1461,28 @@ function updDelta(){
   const b=document.getElementById('delta-btn');
   b.className='delta-btn'+(deltaOn?' on':'');
   b.textContent=deltaOn?'△ 自信なし（ON）':'△ 自信なし';
+}
+
+// =====================================================================
+// BOOKMARK（画像確認フラグ）
+// =====================================================================
+let bookmarkOn = false;
+
+function toggleBookmark(){
+  bookmarkOn=!bookmarkOn;
+  updBookmark();
+  const id=qid(sess.qs[sess.idx]);
+  const prog=getProg();
+  if(!prog[id]) prog[id]={attempt_count:0,correct_count:0,last_result:null,last_confidence_low:false,note:'',last_attempt_at:null};
+  prog[id].bookmarked=bookmarkOn;
+  saveProg(prog);
+  queueSync();
+}
+function updBookmark(){
+  const b=document.getElementById('bookmark-btn');
+  if(!b) return;
+  b.style.opacity=bookmarkOn?'1':'0.4';
+  b.title=bookmarkOn?'🔖 図・画像確認要（ON）':'🔖 図・画像確認要';
 }
 
 // =====================================================================
@@ -1627,6 +1659,15 @@ function showCombo(streak){
 // =====================================================================
 // DASHBOARD
 // =====================================================================
+function getDailyGoal(){ return parseInt(localStorage.getItem('2k_daily_goal')||'20',10); }
+function setDailyGoal(n){ localStorage.setItem('2k_daily_goal', String(n)); renderDash(); }
+function promptGoal(){
+  const cur=getDailyGoal();
+  const v=prompt('今日の目標問題数を入力してください', cur);
+  const n=parseInt(v,10);
+  if(!isNaN(n)&&n>0) setDailyGoal(n);
+}
+
 function renderDash(){
   if(!questions.length) return;
   const prog=getProg(), ks=Object.keys(prog);
@@ -1637,6 +1678,58 @@ function renderDash(){
   const acc  =done?Math.round(cor/done*100):0;
   const day  =getDay();
   const days =Math.ceil((EXAM-new Date())/86400000);
+  const goal =getDailyGoal();
+  const dayPct=Math.min(100,Math.round(day.tot/goal*100));
+  const dayAcc=day.tot>0?Math.round(day.cor/day.tot*100):null;
+  const dayAccColor=dayAcc===null?'var(--muted)':dayAcc>=70?'#4ade80':dayAcc>=40?'#fbbf24':'#f87171';
+
+  // 今日の目標カード
+  document.getElementById('today-card').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-weight:700;font-size:.92rem;">📅 今日の進捗</span>
+      <button onclick="promptGoal()" style="background:none;border:1px solid rgba(148,163,184,.3);color:var(--muted);font-size:.72rem;padding:3px 8px;border-radius:6px;cursor:pointer;">目標: ${goal}問 ✏️</button>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:10px;">
+      <div style="text-align:center;">
+        <div style="font-size:1.6rem;font-weight:800;color:var(--primary)">${day.tot}</div>
+        <div style="font-size:.7rem;color:var(--muted)">解答数</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.6rem;font-weight:800;color:${dayAccColor}">${dayAcc!==null?dayAcc+'%':'-'}</div>
+        <div style="font-size:.7rem;color:var(--muted)">正解率</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">${day.streak}</div>
+        <div style="font-size:.7rem;color:var(--muted)">🔥 連続</div>
+      </div>
+    </div>
+    <div style="background:rgba(148,163,184,.15);border-radius:6px;height:10px;overflow:hidden;">
+      <div style="height:100%;width:${dayPct}%;background:${dayPct>=100?'#4ade80':'var(--primary)'};border-radius:6px;transition:width .4s;"></div>
+    </div>
+    <div style="font-size:.7rem;color:var(--muted);margin-top:4px;text-align:right;">${day.tot}/${goal}問 (${dayPct}%${dayPct>=100?' 🎉 達成！':''})</div>`;
+
+  // 前回解いた問題カード
+  const atts=JSON.parse(localStorage.getItem('2k_att')||'[]');
+  const lastAtt=atts.length?atts[atts.length-1]:null;
+  const lastQ=lastAtt?questions.find(q=>qid(q)===lastAtt.qid):null;
+  if(lastQ){
+    const lastChap=tocM&&tocM.mapping?tocM.chapters[tocM.mapping[lastAtt.qid]]?.s||'':'' ;
+    const pool=getPool();
+    const lastIdx=pool.findIndex(q=>qid(q)===lastAtt.qid);
+    const resumeBtn=lastIdx>=0
+      ?`<button onclick="openFromList(${lastIdx})" style="font-size:.75rem;padding:5px 12px;border-radius:8px;background:var(--primary);color:#0f172a;border:none;cursor:pointer;font-weight:700;">▶ 続きから始める</button>`
+      :`<button onclick="fSubj='';fToc='';fYear='';switchTab('list');" style="font-size:.75rem;padding:5px 12px;border-radius:8px;background:rgba(148,163,184,.2);color:var(--text);border:none;cursor:pointer;">一覧で探す</button>`;
+    document.getElementById('last-q-card').innerHTML=`
+      <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">📌 前回の問題</div>
+        <div style="font-weight:700;margin-bottom:4px;">${lastQ['科目']} ${lastQ['問題番号']} <span style="color:var(--muted);font-weight:400;">${lastQ['年度']}</span></div>
+        ${lastChap?`<div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">📚 ${lastChap}</div>`:''}
+        <div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">${(lastQ['問題文']||'').substring(0,48)}…</div>
+        ${resumeBtn}
+      </div>`;
+  } else {
+    document.getElementById('last-q-card').innerHTML='';
+  }
 
   document.getElementById('dash-grid').innerHTML=`
     <div class="dash-card"><div class="big">${tot}</div><div class="lbl">総問題数</div></div>
