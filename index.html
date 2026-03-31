@@ -523,11 +523,10 @@ select:focus{outline:none;border-color:var(--primary);}
         <!-- Result -->
         <div id="result-wrap"></div>
 
-        <!-- Delta toggle + Bookmark -->
-        <div class="delta-sec" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span class="delta-lbl" style="flex:1;">理解不十分・運で正解・なんとなく外した</span>
+        <!-- Delta toggle -->
+        <div class="delta-sec">
+          <span class="delta-lbl">理解不十分・運で正解・なんとなく外した</span>
           <button class="delta-btn" id="delta-btn" onclick="toggleDelta()">△ 自信なし</button>
-          <button class="delta-btn" id="bookmark-btn" onclick="toggleBookmark()" style="min-width:unset;padding:6px 10px;">🔖</button>
         </div>
 
         <!-- Note -->
@@ -910,6 +909,56 @@ function sortYears(arr) {
     return 999;
   };
   return arr.sort((a,b)=>rank(a)-rank(b));
+}
+
+// 科目→章番号→年度→問題番号 の順にソートした全問リストを返す
+function getSortedQuestions() {
+  const subjOrder={計画:0,法規:1,構造:2,施工:3};
+  const yearNum=y=>{
+    if(y.startsWith('平成')) return parseInt(y.replace('平成','').replace('年',''))||0;
+    if(y.startsWith('令和')){ const n=y.replace('令和','').replace('年',''); return 100+(n==='元'?1:(parseInt(n)||0)); }
+    return 999;
+  };
+  return [...questions].sort((a,b)=>{
+    const qA=qid(a), qB=qid(b);
+    const sA=subjOrder[a['科目']]??99, sB=subjOrder[b['科目']]??99;
+    if(sA!==sB) return sA-sB;
+    const cA=(tocM&&tocM.mapping&&tocM.mapping[qA])||999;
+    const cB=(tocM&&tocM.mapping&&tocM.mapping[qB])||999;
+    if(cA!==cB) return cA-cB;
+    const yA=yearNum(a['年度']||''), yB=yearNum(b['年度']||'');
+    if(yA!==yB) return yA-yB;
+    const nA=parseInt((a['問題番号']||'').replace(/\D/g,''))||0;
+    const nB=parseInt((b['問題番号']||'').replace(/\D/g,''))||0;
+    return nA-nB;
+  });
+}
+
+// 「続きから始める」：最後に解いた問題の次からブラウジングモードで開始
+function resumeFromLast() {
+  const atts=JSON.parse(localStorage.getItem('2k_att')||'[]');
+  const lastQid=atts.length?atts[atts.length-1].qid:null;
+  const sorted=getSortedQuestions();
+  const lastIdx=lastQid?sorted.findIndex(q=>qid(q)===lastQid):-1;
+  const nextIdx=lastIdx>=0?Math.min(lastIdx+1,sorted.length-1):0;
+  sessType='browse';
+  sess={qs:sorted.slice(nextIdx),idx:0,res:[],done:false};
+  answered=false; deltaOn=false; noteOpen=false; selOpt=0;
+  activeTab='quiz';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-quiz').classList.add('active');
+  document.getElementById('view-list').style.display='none';
+  document.getElementById('view-quiz').style.display='block';
+  document.getElementById('view-chap').style.display='none';
+  document.getElementById('view-dash').style.display='none';
+  document.getElementById('filter-bar').style.display='flex';
+  document.getElementById('mode-banner').innerHTML=
+    `<div class="mode-banner">▶ 続きから（${nextIdx+1}問目〜 全${sorted.length}問）</div>`;
+  document.getElementById('sess-hdr').style.display='flex';
+  document.getElementById('q-card').style.display='block';
+  document.getElementById('after-ans').style.display='none';
+  document.getElementById('session-end').style.display='none';
+  renderQ();
 }
 
 function sbadge(s){ return {計画:'bp',法規:'bl',構造:'bs',施工:'bc'}[s]||''; }
@@ -1310,10 +1359,13 @@ function renderQ() {
   // Source viewer (図面・画像がある元ページをiframeで表示)
   const srcUrl=q['URL']||'';
   const sva=document.getElementById('src-viewer-area');
+  const bmActive=!!(p&&p.bookmarked);
+  const bmStyle=`display:inline-flex;align-items:center;gap:3px;font-size:.82rem;padding:6px 10px;border-radius:8px;border:1px solid ${bmActive?'rgba(251,191,36,.6)':'rgba(148,163,184,.3)'};color:${bmActive?'#fbbf24':'var(--muted)'};background:${bmActive?'rgba(251,191,36,.08)':'none'};cursor:pointer;transition:all .2s;`;
   if(srcUrl){
     sva.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button class="src-viewer-btn" onclick="toggleSrcViewer(this,'${srcUrl.replace(/'/g,"\\'")}')">📄 元の問題を見る（図・画像）</button>
         <a href="${srcUrl.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.82rem;padding:6px 12px;border-radius:8px;border:1px solid rgba(56,189,248,.4);color:var(--primary);text-decoration:none;white-space:nowrap;">🔗 別タブで開く</a>
+        <button id="bm-src-btn" onclick="toggleBookmark()" style="${bmStyle}" title="図・画像の確認が必要な問題にマーク">🔖${bmActive?' ON':''}</button>
       </div>
       <div class="src-viewer-wrap" id="src-viewer-wrap">
         <div class="src-viewer-bar"><span>元サイト表示中</span><button class="src-close-btn" onclick="closeSrcViewer()">閉じる ✕</button></div>
@@ -1479,10 +1531,13 @@ function toggleBookmark(){
   queueSync();
 }
 function updBookmark(){
-  const b=document.getElementById('bookmark-btn');
+  // src-viewer横のボタンを更新
+  const b=document.getElementById('bm-src-btn');
   if(!b) return;
-  b.style.opacity=bookmarkOn?'1':'0.4';
-  b.title=bookmarkOn?'🔖 図・画像確認要（ON）':'🔖 図・画像確認要';
+  b.style.border=bookmarkOn?'1px solid rgba(251,191,36,.6)':'1px solid rgba(148,163,184,.3)';
+  b.style.color=bookmarkOn?'#fbbf24':'var(--muted)';
+  b.style.background=bookmarkOn?'rgba(251,191,36,.08)':'none';
+  b.textContent=bookmarkOn?'🔖 ON':'🔖';
 }
 
 // =====================================================================
@@ -1717,7 +1772,7 @@ function renderDash(){
     const pool=getPool();
     const lastIdx=pool.findIndex(q=>qid(q)===lastAtt.qid);
     const resumeBtn=lastIdx>=0
-      ?`<button onclick="openFromList(${lastIdx})" style="font-size:.75rem;padding:5px 12px;border-radius:8px;background:var(--primary);color:#0f172a;border:none;cursor:pointer;font-weight:700;">▶ 続きから始める</button>`
+      ?`<button onclick="resumeFromLast()" style="font-size:.75rem;padding:5px 12px;border-radius:8px;background:var(--primary);color:#0f172a;border:none;cursor:pointer;font-weight:700;">▶ 続きから始める</button>`
       :`<button onclick="fSubj='';fToc='';fYear='';switchTab('list');" style="font-size:.75rem;padding:5px 12px;border-radius:8px;background:rgba(148,163,184,.2);color:var(--text);border:none;cursor:pointer;">一覧で探す</button>`;
     document.getElementById('last-q-card').innerHTML=`
       <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
