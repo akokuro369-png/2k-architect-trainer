@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>2nd Class Architect | 過去問トレーナー</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 :root {
   --bg:      #0f172a;
@@ -411,6 +412,13 @@ select:focus{outline:none;border-color:var(--primary);}
   .dash-grid{grid-template-columns:repeat(2,1fr);}
   .load-card{padding:28px 20px;}
 }
+
+/* ── GRAPH TAB ── */
+.gbtn{padding:3px 9px;border-radius:5px;border:1px solid rgba(100,150,255,0.25);background:rgba(30,50,120,0.25);color:#aac8ff;cursor:pointer;font-size:0.72rem;transition:all 0.2s;white-space:nowrap;font-family:inherit}
+.gbtn:hover{background:rgba(50,80,180,0.4)}
+.gbtn.active{background:rgba(56,120,220,0.6);border-color:#88aaff;color:#fff}
+.gi-row{display:flex;justify-content:space-between;margin:3px 0;color:#99aacc;font-size:0.76rem}
+.gi-row span{color:#dde}
 </style>
 </head>
 <body>
@@ -464,6 +472,7 @@ select:focus{outline:none;border-color:var(--primary);}
     <button class="tab" onclick="switchTab('weak')" id="tab-weak">△ 弱点</button>
     <button class="tab" onclick="switchTab('dash')" id="tab-dash">📊 分析</button>
     <button class="tab" onclick="switchTab('chap')" id="tab-chap">📚 章別</button>
+    <button class="tab" onclick="switchTab('graph')" id="tab-graph">🗺 グラフ</button>
   </div>
 
   <!-- Content -->
@@ -613,6 +622,48 @@ select:focus{outline:none;border-color:var(--primary);}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 12px" onclick="manualSync()">☁️ 今すぐ同期</button>
         <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 12px" onclick="loadFromGasFull()">⬇️ Driveから復元</button>
+      </div>
+    </div>
+    <!-- VIEW: GRAPH -->
+    <div id="view-graph" style="display:none;padding:0;margin:-14px">
+      <div id="graph-container" style="position:relative;width:100%;height:calc(100vh - 120px);background:#07071a;border-radius:0 0 12px 12px;overflow:hidden;">
+        <canvas id="graph-canvas" style="display:block;width:100%;height:100%"></canvas>
+        <!-- Graph controls -->
+        <div id="graph-ui" style="position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;z-index:10">
+          <button class="gbtn active" data-s="all" onclick="gSetSubj('all')">全科目</button>
+          <button class="gbtn" data-s="計画" onclick="gSetSubj('計画')" style="border-color:#4488ff88">計画</button>
+          <button class="gbtn" data-s="法規" onclick="gSetSubj('法規')" style="border-color:#44dd8888">法規</button>
+          <button class="gbtn" data-s="構造" onclick="gSetSubj('構造')" style="border-color:#ffaa4488">構造</button>
+          <button class="gbtn" data-s="施工" onclick="gSetSubj('施工')" style="border-color:#ff668888">施工</button>
+          <div style="width:1px;height:20px;background:rgba(255,255,255,0.15)"></div>
+          <button class="gbtn" id="gbtn-ng" onclick="gSetPerf('ng')">× 不正解</button>
+          <button class="gbtn" id="gbtn-delta" onclick="gSetPerf('delta')">△ 自信なし</button>
+          <button class="gbtn" id="gbtn-unseen" onclick="gSetPerf('unseen')">未着手</button>
+          <button class="gbtn" id="gbtn-ok" onclick="gSetPerf('ok')">○ 正解</button>
+          <span id="graph-stats" style="margin-left:auto;font-size:0.7rem;color:#556"></span>
+        </div>
+        <!-- Legend -->
+        <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font-size:0.7rem;color:#778;background:rgba(7,7,26,0.7);padding:5px 12px;border-radius:20px;pointer-events:none">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44455a;display:inline-block"></span>未着手</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44ff88;display:inline-block"></span>○</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ffaa44;display:inline-block"></span>△</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff4455;display:inline-block"></span>×</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:3px;background:#4488ff;display:inline-block"></span>章</span>
+          <span style="color:#445">　ピンチ:ズーム　ドラッグ:移動</span>
+        </div>
+        <!-- Info panel -->
+        <div id="graph-info" style="display:none;position:absolute;right:10px;top:50px;width:240px;background:rgba(8,10,32,0.97);border:1px solid rgba(80,120,255,0.3);border-radius:10px;padding:12px;font-size:0.78rem;z-index:15">
+          <span onclick="gCloseInfo()" style="float:right;cursor:pointer;color:#446;font-size:1rem">✕</span>
+          <div id="gi-title" style="font-weight:700;color:#88ccff;margin-bottom:4px;font-size:0.82rem;line-height:1.3"></div>
+          <div id="gi-sub" style="color:#667;margin-bottom:8px;font-size:0.72rem"></div>
+          <div id="gi-body"></div>
+          <a id="gi-link" href="#" target="_blank" style="display:none;margin-top:8px;color:#6af;font-size:0.72rem;text-decoration:none;display:block;padding:4px 8px;border:1px solid #6af4;border-radius:5px;text-align:center">🔗 問題を開く</a>
+        </div>
+        <!-- Tooltip -->
+        <div id="graph-tt" style="display:none;position:absolute;pointer-events:none;background:rgba(8,10,32,0.97);border:1px solid rgba(80,130,255,0.4);border-radius:6px;padding:6px 10px;font-size:0.74rem;max-width:240px;line-height:1.4;z-index:20">
+          <div id="gtt-t" style="font-weight:700;color:#88ccff;margin-bottom:2px"></div>
+          <div id="gtt-b" style="color:#aab"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1167,8 +1218,10 @@ function switchTab(tab) {
   document.getElementById('view-quiz').style.display='none';
   document.getElementById('view-dash').style.display='none';
   document.getElementById('view-chap').style.display='none';
-  const hideFilter=tab==='dash'||tab==='chap';
+  document.getElementById('view-graph').style.display='none';
+  const hideFilter=tab==='dash'||tab==='chap'||tab==='graph';
   document.getElementById('filter-bar').style.display=hideFilter?'none':'flex';
+  if(tab==='graph'){ document.getElementById('view-graph').style.display='block'; gInitOnce(); return; }
 
   if(tab==='list'){ document.getElementById('view-list').style.display='block'; renderList(); }
   else if(tab==='quiz'||tab==='weak'){
@@ -1972,6 +2025,350 @@ async function resetAll(){
     if(sb) sb.style.display='none';
   }
 })();
+
+// =====================================================================
+// GRAPH TAB
+// =====================================================================
+let gInitialized = false;
+let gNodes = [], gLinks = [];
+let gTransform = {x:0,y:0,k:1};
+let gSimRunning = false, gFrame = 0;
+let gSelNode = null, gHovNode = null;
+let gSubjFilter = 'all', gPerfFilter = null;
+let gDragging = false, gDragStart = {x:0,y:0}, gTransStart = {x:0,y:0};
+let gClickMoved = false;
+let gCanvas, gCtx, gW, gH;
+let gLastTouches = null, gLastPinchDist = 0;
+let gAnimFrame = null;
+
+const G_SUBJ_COLOR = {'計画':'#4488ff','法規':'#44dd88','構造':'#ffaa44','施工':'#ff6688'};
+const G_PERF_COLOR = {unseen:'#44455a',ok:'#44ff88',delta:'#ffaa44',ng:'#ff4455'};
+const G_SUBJ_POS = {
+  '計画':{rx:-0.36,ry:-0.3},'法規':{rx:0.36,ry:-0.3},
+  '構造':{rx:-0.36,ry:0.3},'施工':{rx:0.36,ry:0.3}
+};
+
+function gGetPerf(qid) {
+  const prog = getProg();
+  const p = prog[qid];
+  if (!p || !p.attempt_count) return 'unseen';
+  if (p.last_confidence_low) return 'delta';
+  if (p.last_result === '×') return 'ng';
+  return 'ok';
+}
+
+function gBuildGraph() {
+  gNodes = []; gLinks = [];
+  const nodeMap = {};
+  const chapCounts = {};
+  const chaps = tocM.chapters;
+  const mapping = tocM.mapping;
+
+  questions.forEach(q => {
+    const id = qid(q);
+    const cid = String(mapping[id]);
+    if (cid) chapCounts[cid] = (chapCounts[cid]||0)+1;
+  });
+
+  // Chapter nodes
+  Object.entries(chaps).forEach(([cid, info]) => {
+    const sp = G_SUBJ_POS[info.subj] || {rx:0,ry:0};
+    const n = {
+      id:'c'+cid, type:'chap', cid,
+      label: info.s.replace(/第\d+章_/,''), subj:info.subj, full:info.s,
+      count: chapCounts[cid]||0,
+      x: gW/2 + sp.rx*gW*0.4 + (Math.random()-0.5)*120,
+      y: gH/2 + sp.ry*gH*0.4 + (Math.random()-0.5)*120,
+      vx:0, vy:0
+    };
+    gNodes.push(n); nodeMap['c'+cid] = n;
+  });
+
+  // Question nodes
+  questions.forEach(q => {
+    const id = qid(q);
+    const cid = String(mapping[id]);
+    const chapNode = nodeMap['c'+cid];
+    const n = {
+      id:'q'+id, type:'q', qid:id,
+      subj: q['科目'], chap:cid, perf: gGetPerf(id),
+      year: q['年度'], qnum: q['問題番号'],
+      txt: (q['問題文']||'').substring(0,80),
+      x: chapNode ? chapNode.x+(Math.random()-0.5)*80 : gW/2+(Math.random()-0.5)*300,
+      y: chapNode ? chapNode.y+(Math.random()-0.5)*80 : gH/2+(Math.random()-0.5)*300,
+      vx:0, vy:0
+    };
+    gNodes.push(n); nodeMap['q'+id] = n;
+    if (chapNode) gLinks.push({source:n, target:chapNode});
+  });
+}
+
+function gForceStep() {
+  const cW = gW*0.85, cH = gH*0.85;
+  const chapNodes = gNodes.filter(n=>n.type==='chap');
+  const qNodes = gNodes.filter(n=>n.type==='q');
+
+  chapNodes.forEach((a,i) => {
+    chapNodes.forEach((b,j) => {
+      if(i>=j) return;
+      const dx=a.x-b.x, dy=a.y-b.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
+      if(dist<120){const f=(120-dist)/120*0.5;a.vx+=(dx/dist)*f;a.vy+=(dy/dist)*f;b.vx-=(dx/dist)*f;b.vy-=(dy/dist)*f;}
+    });
+    const sp=G_SUBJ_POS[a.subj];
+    if(sp){a.vx+=(gW/2+sp.rx*cW-a.x)*0.008;a.vy+=(gH/2+sp.ry*cH-a.y)*0.008;}
+  });
+
+  qNodes.forEach((a,i) => {
+    if(i%4!==gFrame%4) return;
+    qNodes.forEach(b => {
+      if(a===b) return;
+      const dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy;
+      if(d2<625){const d=Math.sqrt(d2)||1,f=(25-d)/25*0.12;a.vx+=(dx/d)*f;a.vy+=(dy/d)*f;}
+    });
+  });
+
+  gLinks.forEach(l => {
+    const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
+    const f=(dist-55)*0.04*0.4;
+    l.source.vx+=(dx/dist)*f;l.source.vy+=(dy/dist)*f;
+    l.target.vx-=(dx/dist)*f*0.04;l.target.vy-=(dy/dist)*f*0.04;
+  });
+
+  gNodes.forEach(n=>{n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy;});
+}
+
+function gIsVis(n) {
+  if(gSubjFilter!=='all'&&n.subj!==gSubjFilter) return false;
+  if(gPerfFilter&&n.type==='q'&&n.perf!==gPerfFilter) return false;
+  return true;
+}
+
+function gNodeR(n) {
+  return n.type==='chap' ? Math.max(9,Math.min(20,7+(n.count||0)*0.085)) : 4.5;
+}
+
+function gDraw() {
+  if(!gCanvas||!gCtx) return;
+  gCtx.clearRect(0,0,gW,gH);
+  gCtx.save();
+  gCtx.translate(gTransform.x,gTransform.y);
+  gCtx.scale(gTransform.k,gTransform.k);
+
+  const selId=gSelNode?gSelNode.id:null, k=gTransform.k;
+  const connIds = new Set();
+  if(selId){gLinks.forEach(l=>{if(l.source.id===selId)connIds.add(l.target.id);if(l.target.id===selId)connIds.add(l.source.id);});connIds.add(selId);}
+
+  // Links
+  gLinks.forEach(l=>{
+    if(!gIsVis(l.source)&&!gIsVis(l.target)) return;
+    const isHi=selId&&connIds.has(l.source.id)&&connIds.has(l.target.id);
+    gCtx.beginPath();gCtx.moveTo(l.source.x,l.source.y);gCtx.lineTo(l.target.x,l.target.y);
+    gCtx.strokeStyle=isHi?'rgba(110,160,255,0.85)':selId?'rgba(255,255,255,0.02)':'rgba(255,255,255,0.06)';
+    gCtx.lineWidth=(isHi?1.8:0.6)/k;
+    gCtx.stroke();
+  });
+
+  // Nodes
+  gNodes.forEach(n=>{
+    if(!gIsVis(n)) return;
+    const r=gNodeR(n), col=G_SUBJ_COLOR[n.subj]||(n.type==='q'?G_PERF_COLOR[n.perf]:'#88aaff');
+    const qcol=n.type==='q'?G_PERF_COLOR[n.perf]:col;
+    const isSel=selId===n.id, isConn=selId&&connIds.has(n.id), isDim=selId&&!connIds.has(n.id);
+    gCtx.beginPath();gCtx.arc(n.x,n.y,r,0,Math.PI*2);
+    if(isSel){gCtx.shadowColor='#fff';gCtx.shadowBlur=24/k;gCtx.fillStyle='#fff';}
+    else if(isDim){gCtx.shadowBlur=0;gCtx.fillStyle=n.type==='chap'?col+'33':'#1a1a2a';}
+    else{gCtx.shadowColor=n.type==='chap'?col:'transparent';gCtx.shadowBlur=n.type==='chap'?10/k:0;gCtx.fillStyle=qcol;}
+    gCtx.fill();gCtx.shadowBlur=0;
+    if(isSel||isConn){gCtx.strokeStyle=isSel?'#fff':qcol;gCtx.lineWidth=(isSel?2:1)/k;gCtx.stroke();}
+    if(n.type==='chap'&&k>=0.32){
+      const fs=Math.min(13,Math.max(8,10/k));
+      gCtx.font=`${fs}px sans-serif`;gCtx.textAlign='center';
+      gCtx.fillStyle=isDim?'rgba(80,90,120,0.4)':'rgba(200,220,255,0.85)';
+      gCtx.fillText(n.label,n.x,n.y+r+fs+2);
+    }
+  });
+  gCtx.restore();
+
+  gAnimFrame = requestAnimationFrame(()=>{
+    if(gSimRunning){gForceStep();gFrame++;if(gFrame>500)gSimRunning=false;}
+    gDraw();
+  });
+}
+
+function gNodeAt(cx,cy) {
+  const wx=(cx-gTransform.x)/gTransform.k, wy=(cy-gTransform.y)/gTransform.k;
+  let best=null, bestD=18/gTransform.k;
+  gNodes.forEach(n=>{if(!gIsVis(n))return;const d=Math.hypot(n.x-wx,n.y-wy);if(d<gNodeR(n)+5&&d<bestD){bestD=d;best=n;}});
+  return best;
+}
+
+function gShowInfo(n) {
+  document.getElementById('graph-info').style.display='block';
+  if(n.type==='chap'){
+    document.getElementById('gi-title').textContent=n.full;
+    document.getElementById('gi-sub').textContent='科目：'+n.subj;
+    const prog=getProg(), pf={ok:0,ng:0,delta:0,unseen:0};
+    questions.forEach(q=>{if(String(tocM.mapping[qid(q)])===n.cid)pf[gGetPerf(qid(q))]++;});
+    const pct=n.count?Math.round(pf.ok/n.count*100):0;
+    document.getElementById('gi-body').innerHTML=
+      `<div class="gi-row">問題数<span>${n.count}問</span></div>
+       <div class="gi-row">正解率<span>${pct}%</span></div>
+       <div class="gi-row">○ 正解<span style="color:#44ff88">${pf.ok}</span></div>
+       <div class="gi-row">△ 自信なし<span style="color:#ffaa44">${pf.delta}</span></div>
+       <div class="gi-row">× 不正解<span style="color:#ff4455">${pf.ng}</span></div>
+       <div class="gi-row">未着手<span style="color:#667">${pf.unseen}</span></div>`;
+    document.getElementById('gi-link').style.display='none';
+  } else {
+    const perf=gGetPerf(n.qid);
+    const pl={ok:'○ 正解',ng:'× 不正解',delta:'△ 自信なし',unseen:'未着手'}[perf];
+    const prog=getProg(), p=prog[n.qid]||{};
+    document.getElementById('gi-title').textContent=n.year+' '+n.qnum;
+    document.getElementById('gi-sub').textContent=n.subj+' / '+(tocM.chapters[n.chap]?.s||'');
+    document.getElementById('gi-body').innerHTML=
+      `<div style="margin:5px 0;color:#aab;line-height:1.4;font-size:0.73rem">${n.txt}…</div>
+       <div class="gi-row">成績<span style="color:${G_PERF_COLOR[perf]}">${pl}</span></div>
+       ${p.attempt_count?`<div class="gi-row">挑戦<span>${p.correct_count}/${p.attempt_count}</span></div>`:''}`;
+    const lnk=document.getElementById('gi-link');
+    lnk.href='https://2kenchikushi.kakomonn.com/questions/'+n.qid;
+    lnk.style.display='block';
+  }
+}
+
+function gCloseInfo(){document.getElementById('graph-info').style.display='none';gSelNode=null;}
+
+function gSetSubj(s){
+  gSubjFilter=s;
+  document.querySelectorAll('.gbtn[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===s));
+  gUpdateStats();
+}
+
+function gSetPerf(p){
+  gPerfFilter=(gPerfFilter===p)?null:p;
+  ['ng','delta','unseen','ok'].forEach(k=>{
+    const el=document.getElementById('gbtn-'+k);
+    if(el)el.classList.toggle('active',gPerfFilter===k);
+  });
+  gUpdateStats();
+}
+
+function gUpdateStats(){
+  const vis=gNodes.filter(n=>n.type==='q'&&gIsVis(n)).length;
+  const el=document.getElementById('graph-stats');
+  if(el) el.textContent='表示中: '+vis+'問 / '+questions.length+'問';
+}
+
+function gRefreshPerf(){
+  gNodes.forEach(n=>{if(n.type==='q')n.perf=gGetPerf(n.qid);});
+}
+
+function gInitOnce(){
+  if(gInitialized) { gRefreshPerf(); gUpdateStats(); return; }
+  gCanvas=document.getElementById('graph-canvas');
+  gCtx=gCanvas.getContext('2d');
+  gW=gCanvas.offsetWidth||window.innerWidth;
+  gH=gCanvas.offsetHeight||(window.innerHeight-120);
+  gCanvas.width=gW; gCanvas.height=gH;
+  gTransform={x:gW/2,y:gH/2,k:0.75};
+
+  new ResizeObserver(()=>{
+    gW=gCanvas.offsetWidth; gH=gCanvas.offsetHeight;
+    gCanvas.width=gW; gCanvas.height=gH;
+  }).observe(gCanvas);
+
+  // Mouse events
+  gCanvas.addEventListener('mousemove',e=>{
+    if(gDragging){gClickMoved=true;gTransform.x=gTransStart.x+e.clientX-gDragStart.x;gTransform.y=gTransStart.y+e.clientY-gDragStart.y;return;}
+    gHovNode=gNodeAt(e.clientX,e.clientY-gCanvas.getBoundingClientRect().top+gCanvas.offsetTop);
+    const rect=gCanvas.getBoundingClientRect();
+    gHovNode=gNodeAt(e.clientX,e.clientY-rect.top+gCanvas.getBoundingClientRect().top);
+    // Simpler:
+    gHovNode=gNodeAtPage(e.clientX,e.clientY);
+    gCanvas.style.cursor=gHovNode?'pointer':'grab';
+    const tt=document.getElementById('graph-tt');
+    if(gHovNode){
+      const n=gHovNode;
+      document.getElementById('gtt-t').textContent=n.type==='chap'?`【${n.subj}】${n.full}`:`${n.year} ${n.qnum}`;
+      document.getElementById('gtt-b').textContent=n.type==='chap'?`${n.count}問収録`:(n.txt||'').substring(0,55)+'…';
+      tt.style.display='block';
+      const rect=gCanvas.getBoundingClientRect();
+      tt.style.left=(e.clientX-rect.left+12)+'px';
+      tt.style.top=(e.clientY-rect.top+8)+'px';
+    } else { tt.style.display='none'; }
+  });
+
+  gCanvas.addEventListener('mousedown',e=>{gDragging=true;gClickMoved=false;gDragStart={x:e.clientX,y:e.clientY};gTransStart={x:gTransform.x,y:gTransform.y};gCanvas.style.cursor='grabbing';});
+  window.addEventListener('mouseup',()=>{gDragging=false;});
+  gCanvas.addEventListener('click',e=>{
+    if(gClickMoved) return;
+    const n=gNodeAtPage(e.clientX,e.clientY);
+    if(n){gSelNode=(gSelNode&&gSelNode.id===n.id)?null:n;if(gSelNode)gShowInfo(gSelNode);else gCloseInfo();}
+    else{gSelNode=null;gCloseInfo();}
+  });
+  gCanvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const f=e.deltaY>0?0.88:1.14;
+    const rect=gCanvas.getBoundingClientRect();
+    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+    gTransform.x=cx-(cx-gTransform.x)*f;
+    gTransform.y=cy-(cy-gTransform.y)*f;
+    gTransform.k=Math.max(0.1,Math.min(8,gTransform.k*f));
+    gSimRunning=true;gFrame=0;
+  },{passive:false});
+
+  // Touch events
+  gCanvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(e.touches.length===1){gDragging=true;gClickMoved=false;gDragStart={x:e.touches[0].clientX,y:e.touches[0].clientY};gTransStart={x:gTransform.x,y:gTransform.y};}
+    else if(e.touches.length===2){gLastPinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
+    gLastTouches=e.touches;
+  },{passive:false});
+  gCanvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===1&&gDragging){
+      const dx=e.touches[0].clientX-gDragStart.x,dy=e.touches[0].clientY-gDragStart.y;
+      if(Math.hypot(dx,dy)>5)gClickMoved=true;
+      gTransform.x=gTransStart.x+dx;gTransform.y=gTransStart.y+dy;
+    } else if(e.touches.length===2){
+      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      const f=d/(gLastPinchDist||d);
+      const mx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const my=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const rect=gCanvas.getBoundingClientRect();
+      const cx=mx-rect.left,cy=my-rect.top;
+      gTransform.x=cx-(cx-gTransform.x)*f;
+      gTransform.y=cy-(cy-gTransform.y)*f;
+      gTransform.k=Math.max(0.1,Math.min(8,gTransform.k*f));
+      gLastPinchDist=d;
+    }
+    gLastTouches=e.touches;gSimRunning=true;gFrame=0;
+  },{passive:false});
+  gCanvas.addEventListener('touchend',e=>{
+    if(!gClickMoved&&gLastTouches&&gLastTouches.length===1){
+      const t=gLastTouches[0];
+      const n=gNodeAtPage(t.clientX,t.clientY);
+      if(n){gSelNode=(gSelNode&&gSelNode.id===n.id)?null:n;if(gSelNode)gShowInfo(gSelNode);else gCloseInfo();}
+      else{gSelNode=null;gCloseInfo();}
+    }
+    gDragging=false;gLastTouches=null;
+  });
+
+  gBuildGraph();
+  gUpdateStats();
+  gSimRunning=true; gFrame=0;
+  gDraw();
+  gInitialized=true;
+}
+
+function gNodeAtPage(px,py){
+  const rect=gCanvas.getBoundingClientRect();
+  const cx=px-rect.left,cy=py-rect.top;
+  const wx=(cx-gTransform.x)/gTransform.k,wy=(cy-gTransform.y)/gTransform.k;
+  let best=null,bestD=18/gTransform.k;
+  gNodes.forEach(n=>{if(!gIsVis(n))return;const d=Math.hypot(n.x-wx,n.y-wy);if(d<gNodeR(n)+6&&d<bestD){bestD=d;best=n;}});
+  return best;
+}
+// =====================================================================
+
 </script>
 </body>
 </html>
