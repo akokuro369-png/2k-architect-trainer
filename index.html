@@ -625,50 +625,50 @@ select:focus{outline:none;border-color:var(--primary);}
       </div>
     </div>
     <!-- VIEW: GRAPH -->
-    <div id="view-graph" style="display:none;padding:0;margin:-14px">
-      <div id="graph-container" style="position:relative;width:100%;height:calc(100vh - 120px);background:#07071a;border-radius:0 0 12px 12px;overflow:hidden;">
-        <canvas id="graph-canvas" style="display:block;width:100%;height:100%"></canvas>
-        <!-- Graph controls -->
-        <div id="graph-ui" style="position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;z-index:10">
-          <button class="gbtn active" data-s="all" onclick="gSetSubj('all')">全科目</button>
-          <button class="gbtn" data-s="計画" onclick="gSetSubj('計画')" style="border-color:#4488ff88">計画</button>
-          <button class="gbtn" data-s="法規" onclick="gSetSubj('法規')" style="border-color:#44dd8888">法規</button>
-          <button class="gbtn" data-s="構造" onclick="gSetSubj('構造')" style="border-color:#ffaa4488">構造</button>
-          <button class="gbtn" data-s="施工" onclick="gSetSubj('施工')" style="border-color:#ff668888">施工</button>
-          <div style="width:1px;height:20px;background:rgba(255,255,255,0.15)"></div>
-          <button class="gbtn" id="gbtn-ng" onclick="gSetPerf('ng')">× 不正解</button>
-          <button class="gbtn" id="gbtn-delta" onclick="gSetPerf('delta')">△ 自信なし</button>
-          <button class="gbtn" id="gbtn-unseen" onclick="gSetPerf('unseen')">未着手</button>
-          <button class="gbtn" id="gbtn-ok" onclick="gSetPerf('ok')">○ 正解</button>
-          <span id="graph-stats" style="margin-left:auto;font-size:0.7rem;color:#556"></span>
-        </div>
-        <!-- Legend -->
-        <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font-size:0.7rem;color:#778;background:rgba(7,7,26,0.7);padding:5px 12px;border-radius:20px;pointer-events:none">
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44455a;display:inline-block"></span>未着手</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44ff88;display:inline-block"></span>○</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ffaa44;display:inline-block"></span>△</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff4455;display:inline-block"></span>×</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:3px;background:#4488ff;display:inline-block"></span>章</span>
-          <span style="color:#445">　ピンチ:ズーム　ドラッグ:移動</span>
-        </div>
-        <!-- Info panel -->
-        <div id="graph-info" style="display:none;position:absolute;right:10px;top:50px;width:240px;background:rgba(8,10,32,0.97);border:1px solid rgba(80,120,255,0.3);border-radius:10px;padding:12px;font-size:0.78rem;z-index:15">
-          <span onclick="gCloseInfo()" style="float:right;cursor:pointer;color:#446;font-size:1rem">✕</span>
-          <div id="gi-title" style="font-weight:700;color:#88ccff;margin-bottom:4px;font-size:0.82rem;line-height:1.3"></div>
-          <div id="gi-sub" style="color:#667;margin-bottom:8px;font-size:0.72rem"></div>
-          <div id="gi-body"></div>
-          <a id="gi-link" href="#" target="_blank" style="display:none;margin-top:8px;color:#6af;font-size:0.72rem;text-decoration:none;display:block;padding:4px 8px;border:1px solid #6af4;border-radius:5px;text-align:center">🔗 問題を開く</a>
-        </div>
-        <!-- Tooltip -->
-        <div id="graph-tt" style="display:none;position:absolute;pointer-events:none;background:rgba(8,10,32,0.97);border:1px solid rgba(80,130,255,0.4);border-radius:6px;padding:6px 10px;font-size:0.74rem;max-width:240px;line-height:1.4;z-index:20">
-          <div id="gtt-t" style="font-weight:700;color:#88ccff;margin-bottom:2px"></div>
-          <div id="gtt-b" style="color:#aab"></div>
-        </div>
-      </div>
-    </div>
+    <div id="view-graph" style="display:none"></div>
   </div>
 </div>
 
+<!-- GRAPH OVERLAY (fixed, full screen) -->
+<div id="graph-container" style="display:none;position:fixed;top:85px;left:0;right:0;bottom:0;background:#07071a;z-index:50;overflow:hidden;">
+  <canvas id="graph-canvas"></canvas>
+  <!-- Graph controls -->
+  <div id="graph-ui" style="position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;z-index:10">
+    <button class="gbtn active" data-s="all" onclick="gSetSubj('all')">全科目</button>
+    <button class="gbtn" data-s="計画" onclick="gSetSubj('計画')" style="border-color:#4488ff88">計画</button>
+    <button class="gbtn" data-s="法規" onclick="gSetSubj('法規')" style="border-color:#44dd8888">法規</button>
+    <button class="gbtn" data-s="構造" onclick="gSetSubj('構造')" style="border-color:#ffaa4488">構造</button>
+    <button class="gbtn" data-s="施工" onclick="gSetSubj('施工')" style="border-color:#ff668888">施工</button>
+    <div style="width:1px;height:20px;background:rgba(255,255,255,0.15)"></div>
+    <button class="gbtn" id="gbtn-ng" onclick="gSetPerf('ng')">× 不正解</button>
+    <button class="gbtn" id="gbtn-delta" onclick="gSetPerf('delta')">△ 自信なし</button>
+    <button class="gbtn" id="gbtn-unseen" onclick="gSetPerf('unseen')">未着手</button>
+    <button class="gbtn" id="gbtn-ok" onclick="gSetPerf('ok')">○ 正解</button>
+    <span id="graph-stats" style="margin-left:auto;font-size:0.7rem;color:#556"></span>
+  </div>
+  <!-- Legend -->
+  <div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font-size:0.7rem;color:#778;background:rgba(7,7,26,0.75);padding:5px 14px;border-radius:20px;pointer-events:none;white-space:nowrap">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44455a;display:inline-block"></span>未着手</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#44ff88;display:inline-block"></span>○</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ffaa44;display:inline-block"></span>△</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff4455;display:inline-block"></span>×</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:3px;background:#4488ff;display:inline-block"></span>章</span>
+    <span style="color:#445;margin-left:4px">ピンチ:ズーム　ドラッグ:移動　タップ:詳細</span>
+  </div>
+  <!-- Info panel -->
+  <div id="graph-info" style="display:none;position:absolute;right:12px;top:50px;width:240px;background:rgba(8,10,32,0.97);border:1px solid rgba(80,120,255,0.3);border-radius:10px;padding:12px;font-size:0.78rem;z-index:15">
+    <span onclick="gCloseInfo()" style="float:right;cursor:pointer;color:#446;font-size:1.1rem">✕</span>
+    <div id="gi-title" style="font-weight:700;color:#88ccff;margin-bottom:4px;font-size:0.82rem;line-height:1.3"></div>
+    <div id="gi-sub" style="color:#667;margin-bottom:8px;font-size:0.72rem"></div>
+    <div id="gi-body"></div>
+    <a id="gi-link" href="#" target="_blank" style="margin-top:8px;color:#6af;font-size:0.72rem;text-decoration:none;display:none;padding:4px 8px;border:1px solid rgba(100,170,255,0.3);border-radius:5px;text-align:center">🔗 問題を開く</a>
+  </div>
+  <!-- Tooltip -->
+  <div id="graph-tt" style="display:none;position:absolute;pointer-events:none;background:rgba(8,10,32,0.97);border:1px solid rgba(80,130,255,0.4);border-radius:6px;padding:6px 10px;font-size:0.74rem;max-width:240px;line-height:1.4;z-index:20">
+    <div id="gtt-t" style="font-weight:700;color:#88ccff;margin-bottom:2px"></div>
+    <div id="gtt-b" style="color:#aab"></div>
+  </div>
+</div>
 <div class="combo-toast" id="combo-toast"></div>
 
 <script>
@@ -1221,7 +1221,13 @@ function switchTab(tab) {
   document.getElementById('view-graph').style.display='none';
   const hideFilter=tab==='dash'||tab==='chap'||tab==='graph';
   document.getElementById('filter-bar').style.display=hideFilter?'none':'flex';
-  if(tab==='graph'){ document.getElementById('view-graph').style.display='block'; gInitOnce(); return; }
+  if(tab==='graph'){
+    document.getElementById('view-graph').style.display='block';
+    document.getElementById('graph-container').style.display='block';
+    setTimeout(gInitOnce, 30);
+    return;
+  }
+  document.getElementById('graph-container').style.display='none';
 
   if(tab==='list'){ document.getElementById('view-list').style.display='block'; renderList(); }
   else if(tab==='quiz'||tab==='weak'){
@@ -2265,15 +2271,19 @@ function gInitOnce(){
   if(gInitialized) { gRefreshPerf(); gUpdateStats(); return; }
   gCanvas=document.getElementById('graph-canvas');
   gCtx=gCanvas.getContext('2d');
-  gW=gCanvas.offsetWidth||window.innerWidth;
-  gH=gCanvas.offsetHeight||(window.innerHeight-120);
+  const cont=document.getElementById('graph-container');
+  gW=cont.offsetWidth||window.innerWidth;
+  gH=cont.offsetHeight||(window.innerHeight-85);
   gCanvas.width=gW; gCanvas.height=gH;
-  gTransform={x:gW/2,y:gH/2,k:0.75};
+  gCanvas.style.width=gW+'px'; gCanvas.style.height=gH+'px';
+  gTransform={x:gW/2,y:gH/2,k:0.72};
 
   new ResizeObserver(()=>{
-    gW=gCanvas.offsetWidth; gH=gCanvas.offsetHeight;
+    const c=document.getElementById('graph-container');
+    gW=c.offsetWidth; gH=c.offsetHeight;
     gCanvas.width=gW; gCanvas.height=gH;
-  }).observe(gCanvas);
+    gSimRunning=true; gFrame=0;
+  }).observe(cont);
 
   // Mouse events
   gCanvas.addEventListener('mousemove',e=>{
