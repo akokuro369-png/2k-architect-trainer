@@ -668,9 +668,9 @@ select:focus{outline:none;border-color:var(--primary);}
       <small>Google Apps Script をウェブアプリとしてデプロイしたURLを貼り付けてください</small>
     </div>
     <div class="mfield">
-      <label>CSVファイルID（任意）</label>
+      <label id="csv-id-label">CSVファイルID（任意）</label>
       <input type="text" id="set-csv-id" placeholder="例: 1aBcDeFgHiJkLmNoPqRsTuVwXyZ" autocomplete="off">
-      <small>GoogleドライブにCSVを置いてGASと同じアカウントで共有 → ファイルIDを入力すると次回から自動読み込み</small>
+      <small id="csv-id-hint">GoogleドライブにCSVを置いてGASと同じアカウントで共有 → ファイルIDを入力すると次回から自動読み込み</small>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeSettings()">キャンセル</button>
@@ -930,7 +930,7 @@ function setSyncDot(state){
   if(lbl)lbl.textContent=state==='busy'?'同期中':state==='ok'?'同期済':state==='err'?'エラー':'同期';
 }
 
-async function gasGet(action){if(!gasUrl)return null;const r=await fetch(gasUrl+'?action='+action,{redirect:'follow'});return r.json();}
+async function gasGet(action){if(!gasUrl)return null;const r=await fetch(gasUrl+'?action='+action+'&mode='+appMode,{redirect:'follow'});return r.json();}
 async function gasPost(body){if(!gasUrl)return null;const r=await fetch(gasUrl,{method:'POST',body:JSON.stringify(body),redirect:'follow'});return r.json();}
 
 async function syncToGas(){
@@ -959,7 +959,7 @@ async function loadFromGasFull(){
     if(d.attempts&&d.attempts!=='[]')localStorage.setItem(attKey(),d.attempts);
     if(d.day&&d.day!=='{}')localStorage.setItem(appMode==='mitsuki'?'2k_day_mitsuki':'2k_day',d.day);
     if(d.ans_overrides&&d.ans_overrides!=='{}')localStorage.setItem('2k_ans_ov',d.ans_overrides);
-    if(d.csv_file_id)localStorage.setItem('2k_csv_file_id',d.csv_file_id);
+    if(d.csv_file_id){const ck=appMode==='mitsuki'?'2k_csv_file_id_mitsuki':'2k_csv_file_id';localStorage.setItem(ck,d.csv_file_id);}
     setSyncDot('ok');return true;
   }catch(e){setSyncDot('err');return false;}
 }
@@ -970,7 +970,7 @@ async function manualSync(){if(!gasUrl){openSettings();return;}await syncToGas()
 async function loadCsvFromGas(){
   if(!gasUrl)return false;
   try{
-    const r=await fetch(gasUrl+'?action=csv',{redirect:'follow'});
+    const r=await fetch(gasUrl+'?action=csv&mode='+appMode,{redirect:'follow'});
     if(!r.ok)return false;
     const text=await r.text();
     if(!text||text.trim().startsWith('{'))return false;
@@ -992,40 +992,85 @@ async function autoLoadFromGas(){
   else{st.textContent='❌ 読み込み失敗。GAS URL・CSVファイルID を確認してください。';st.style.color='var(--ng)';}
 }
 
+
 function openSettings(){
-  document.getElementById('set-gas-url').value=gasUrl;
-  document.getElementById('set-csv-id').value=localStorage.getItem('2k_csv_file_id')||'';
-  document.getElementById('settings-msg').textContent='';
-  document.getElementById('settings-modal').classList.add('open');
+  document.getElementById("set-gas-url").value=gasUrl;
+  const csvKey=appMode==="mitsuki"?"2k_csv_file_id_mitsuki":"2k_csv_file_id";
+  document.getElementById("set-csv-id").value=localStorage.getItem(csvKey)||"";
+  const lbl=document.getElementById("csv-id-label");
+  const hint=document.getElementById("csv-id-hint");
+  if(appMode==="mitsuki"){
+    lbl.innerHTML="みつきCSVファイルID（任意）<span class=\"badge bm\" style=\"margin-left:6px\">みつき</span>";
+    hint.textContent="みつき一問一答CSVをGoogleドライブに置いてファイルIDを入力";
+  }else{
+    lbl.innerHTML="CSVファイルID（任意）<span class=\"badge bp\" style=\"margin-left:6px\">過去問</span>";
+    hint.textContent="GoogleドライブにCSVを置いてGASと同じアカウントで共有 → ファイルIDを入力すると次回から自動読み込み";
+  }
+  document.getElementById("settings-msg").textContent="";
+  document.getElementById("settings-modal").classList.add("open");
 }
-function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
+function closeSettings(){document.getElementById("settings-modal").classList.remove("open");}
 
 async function testGasConnection(){
-  const url=document.getElementById('set-gas-url').value.trim();
-  const msg=document.getElementById('settings-msg');
-  if(!url){msg.textContent='URLを入力してください';return;}
-  msg.style.color='var(--muted)';msg.textContent='🔌 接続テスト中...';
+  const url=document.getElementById("set-gas-url").value.trim();
+  const msg=document.getElementById("settings-msg");
+  if(!url){msg.textContent="URLを入力してください";return;}
+  msg.style.color="var(--muted)";msg.textContent="🔌 接続テスト中...";
   try{
-    const r=await fetch(url+'?action=ping',{redirect:'follow'});
+    const r=await fetch(url+"?action=ping",{redirect:"follow"});
     const d=await r.json();
-    if(d.status==='ok'){msg.style.color='var(--ok)';msg.textContent='✅ 接続成功！';}
-    else{msg.style.color='var(--ng)';msg.textContent='❌ エラー: '+(d.error||'不明');}
-  }catch(e){msg.style.color='var(--ng)';msg.textContent='❌ 接続失敗: '+e.message;}
+    if(d.status==="ok"){msg.style.color="var(--ok)";msg.textContent="✅ 接続成功！";}
+    else{msg.style.color="var(--ng)";msg.textContent="❌ エラー: "+(d.error||"不明");}
+  }catch(e){msg.style.color="var(--ng)";msg.textContent="❌ 接続失敗: "+e.message;}
 }
 
 async function saveSettings(){
-  gasUrl=document.getElementById('set-gas-url').value.trim();
-  const csvId=document.getElementById('set-csv-id').value.trim();
-  localStorage.setItem('2k_gas_url',gasUrl);
-  if(csvId)localStorage.setItem('2k_csv_file_id',csvId);
-  if(gasUrl&&csvId){try{await gasPost({action:'save',csv_file_id:csvId});}catch(e){}}
+  gasUrl=document.getElementById("set-gas-url").value.trim();
+  const csvId=document.getElementById("set-csv-id").value.trim();
+  const csvKey=appMode==="mitsuki"?"2k_csv_file_id_mitsuki":"2k_csv_file_id";
+  localStorage.setItem("2k_gas_url",gasUrl);
+  if(csvId)localStorage.setItem(csvKey,csvId);
+  if(gasUrl&&csvId){try{await gasPost({action:"save",csv_file_id:csvId,mode:appMode});}catch(e){}}
   closeSettings();
-  const btn=document.getElementById('sync-btn');
-  if(btn)btn.style.display=gasUrl?'':'none';
-  const ga=document.getElementById('gas-load-area');
-  if(ga)ga.style.display=gasUrl?'':'none';
+  const btn=document.getElementById("sync-btn");
+  if(btn)btn.style.display=gasUrl?"":"none";
+  const ga=document.getElementById("gas-load-area");
+  if(ga)ga.style.display=gasUrl?"":"none";
   if(questions.length){await loadFromGasFull();updateHdr();renderList();renderDash();await syncToGas();}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // =====================================================================
 // ANS OVERRIDE
